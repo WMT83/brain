@@ -1,0 +1,13 @@
+# Secrets never belong in git. Werner sets these in the Supabase dashboard.
+.env
+.env.*
+!.env.example
+
+# Supabase CLI local state.
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# Node and editor noise.
+node_modules/
+.DS_Store

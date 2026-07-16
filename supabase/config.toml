@@ -1,0 +1,13 @@
+# Meeting Hub :: Supabase local config.
+# Project ref is fixed. Function verify_jwt flags mirror what is deployed.
+
+project_id = "yqpkaigyrtqctvfzhzcl"
+
+# Zoom fires this with its own signature, not a Supabase JWT, so JWT
+# verification is off. The function verifies the Zoom signature itself.
+[functions.zoom-webhook]
+verify_jwt = false
+
+# Invoked by pg_cron via pg_net. Not user facing, so JWT verification is off.
+[functions.process-jobs]
+verify_jwt = false
