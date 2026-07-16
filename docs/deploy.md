@@ -3,6 +3,27 @@
 Project ref `yqpkaigyrtqctvfzhzcl`. Run these from the Supabase dashboard SQL
 editor or via the CLI once linked.
 
+## Current state
+
+Milestone 2 is deployed to the live project.
+
+Done:
+- `claim_jobs` migration applied (version 20260716104224).
+- `pg_cron` and `pg_net` enabled.
+- `process-jobs` function deployed with `verify_jwt = false`.
+- The cron job `process-jobs` is scheduled and firing every minute. The
+  function has been confirmed reachable and returns `{"ok":true,"claimed":0}`
+  on an empty queue.
+
+Still needed before a real meeting can transcribe. Only Werner can do these:
+- Set `DEEPGRAM_API_KEY` in Edge Function secrets. Without it every transcribe
+  job fails.
+- Store the `service_role_key` in Vault (see below). The cron already reads from
+  Vault. Until the secret exists the cron still fires, because the function does
+  not verify the JWT, but the intended auth is the service key.
+- Configure the Zoom Marketplace app so `recording.completed` reaches
+  `zoom-webhook`, and set `ZOOM_WEBHOOK_SECRET_TOKEN`.
+
 ## Secrets
 
 Set in Dashboard, Project Settings, Edge Functions, Secrets:
