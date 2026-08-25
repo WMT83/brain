@@ -1,0 +1,2 @@
+'use client'; import {useEffect,useState} from 'react'; import {AuraState,Task} from '@/types'; import {loadState,saveState} from '@/lib/store';
+export function useAura(){const [state,setState]=useState<AuraState|null>(null);useEffect(()=>setState(loadState()),[]);useEffect(()=>{if(state)saveState(state)},[state]);const patch=(p:Partial<AuraState>)=>setState(s=>s?{...s,...p}:s);const updateTask=(id:string,p:Partial<Task>)=>setState(s=>s?{...s,tasks:s.tasks.map(t=>t.id===id?{...t,...p}:t)}:s);return{state,patch,updateTask,setState}}

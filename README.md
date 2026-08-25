@@ -1,80 +1,123 @@
-# Meeting Hub
+# AURA
 
-Meeting Hub turns Zoom cloud recordings into searchable, summarised meeting
-records. Zoom fires a webhook when a recording finishes. The audio is stored,
-transcribed with speaker diarisation, then later summarised and indexed for
-search and question answering.
+**Plan. Focus. Accept. Thrive.** AURA is a responsive, neurodiversity-affirming daily routine and executive-function support MVP. It externalises working memory and supports autonomy. It is not a diagnostic system, medical device, autism treatment, or substitute for professional or crisis support.
 
-This repo holds the Supabase backend: the database schema, storage, and the
-edge functions that run the pipeline.
+## What was built
 
-Supabase project: Meeting Hub, ref `yqpkaigyrtqctvfzhzcl`, org Katalis Co,
-region ap-southeast-2 (Sydney).
+- Four-step lightweight onboarding with no diagnostic history.
+- A calm Today view with one recommended action, an editable full-day schedule, task completion, skipping, local persistence, and low-demand mode.
+- Routine builder with editable activities, times, ordering, optional status, deletion, and morning, afternoon, and evening periods.
+- Task breakdown, minimum version, supportive focus timer, sensory and capacity check-in, overload mode, CBT-informed Thought Check, ACT-informed values action, weekly progress, and accessibility settings.
+- Mobile bottom navigation and desktop sidebar, large targets, semantic controls, visible focus, reduced-motion CSS, high contrast, adjustable text, and non-colour state labels.
+- Installable PWA manifest and browser-first optimistic persistence. Supabase schema and RLS support authenticated cloud sync as the next integration layer.
 
-## Layout
+## Architecture
 
+Next.js App Router and TypeScript provide the application shell. Feature components live under `components/`, domain types under `types/`, pure task logic in `lib/`, and persistent state orchestration in `hooks/`. The demo intentionally works without Supabase credentials. `localStorage` provides immediate offline persistence. The schema uses ownership columns and transitive RLS policies. A production sync adapter can write the same state changes to Supabase with an outbox and conflict resolution.
+
+## Get AURA functional locally
+
+The current MVP is a **local demo application**. You do not need a Supabase
+project to use the screens or save Alex's data. Supabase credentials only become
+necessary once cloud authentication and synchronisation are connected.
+
+### Prerequisites
+
+- Node.js 20.9 or newer (Node 22 LTS is recommended).
+- npm with access to `https://registry.npmjs.org`.
+
+From the repository root, run:
+
+```bash
+npm install
+npm run doctor
+npm run dev
 ```
-supabase/
-  config.toml                  project ref and function verify_jwt flags
-  migrations/                  schema, applied in filename order
-  functions/
-    zoom-webhook/              receives Zoom recording.completed, queues a job
-    process-jobs/              cron worker, drains the job queue
+
+Open `http://localhost:3000`. Complete onboarding as Alex, or use the seeded
+routine. Data remains in that browser between sessions. Clear the
+`aura-state-v1` local storage key in browser developer tools to replay onboarding.
+
+For a production-style local check:
+
+```bash
+npm run check
+npm run build
+npm start
 ```
 
-## Milestones
+Then open `http://localhost:3000` again. `npm run doctor` reports the exact
+missing prerequisite when the application cannot start.
 
-1. Schema, storage, RLS, and the `zoom-webhook` function. Deployed.
-2. The `process-jobs` worker and English transcription via Deepgram. This pass.
-3. Afrikaans routing. Not started.
-4. Summaries. Not started.
-5. Upload ingestion. Not started.
-6. Search and ask. Not started.
-7. The hub UI. Not started.
+### If `npm install` returns HTTP 403
 
-## The pipeline so far
+That response is a network or registry policy issue, not an AURA runtime error.
+Check the configured registry and proxy:
 
-1. Zoom sends `recording.completed` to `zoom-webhook`. The function verifies the
-   signature, inserts a `meetings` row keyed on `zoom_meeting_uuid`, downloads
-   the audio into the private `meeting-audio` bucket, and queues a `transcribe`
-   job.
-2. `process-jobs` runs once a minute. It claims queued jobs with `claim_jobs()`,
-   which uses `for update skip locked` so two runs never claim the same job. For
-   a `transcribe` job it signs the audio, calls Deepgram (`nova-3`, diarised,
-   language detected), writes `utterances` and `meeting_participants`, and moves
-   the meeting from `pending_transcription` to `transcribing` to `transcribed`.
-   A job that fails is requeued until three attempts, then marked `failed`.
+```bash
+npm config get registry
+npm config get proxy
+npm config get https-proxy
+npm ping
+```
 
-## Function auth
+The registry should normally be `https://registry.npmjs.org/`. On a managed
+network, use the organisation's approved npm mirror or ask the administrator to
+allow the packages listed in `package.json`. Do not work around organisational
+security policy by downloading unverified dependency archives.
 
-`zoom-webhook` and `process-jobs` both run with `verify_jwt = false`. Zoom sends
-its own signature, not a Supabase JWT, and the cron worker is called internally.
-User facing functions that arrive later (`search`, `ask`, `ingest-upload`) will
-use `verify_jwt = true`.
+### Optional environment file
 
-## Secrets
+To prepare for Supabase, copy the example and fill in public project values:
 
-Set these in the Supabase dashboard. Never commit them.
+```bash
+cp .env.example .env.local
+```
 
-- `ANTHROPIC_API_KEY` for the summariser (milestone 4).
-- `ZOOM_WEBHOOK_SECRET_TOKEN` for the webhook signature check.
-- `DEEPGRAM_API_KEY` for transcription.
-- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to functions by the
-  platform.
-- `DEFAULT_OWNER_ID` optionally sets the owner on webhook-created meetings.
+Leaving these values unset does not prevent the current local demo from running.
 
-Anthropic-calling functions use model `claude-sonnet-4-5`.
+## Supabase
 
-## The cron schedule
+1. Create a Supabase project and copy its URL and anon key into `.env.local`.
+2. Link the CLI with `supabase link --project-ref <ref>`.
+3. Apply migrations with `supabase db push`.
+4. Enable email authentication in the Supabase dashboard. The present demo is local-first; connecting UI authentication and the sync adapter is documented as a known limitation rather than pretending local demo identity is secure authentication.
 
-`process-jobs` is invoked every minute by `pg_cron` through `pg_net`. The service
-role key is read from Vault, never inlined in the cron command. See
-`docs/deploy.md` for the exact statements.
+All AURA tables are prefixed `aura_` so they can safely coexist with the repository's Meeting Hub schema. Every personal table has RLS. Child records are authorised through their owning routine. Thoughts and reflections are not included in third-party analytics.
 
-## Conventions
+## Test and quality checks
 
-- British and Australian spelling throughout, including comments and docs.
-- No em dashes. Short declarative sentences.
-- Git identity for anything connected to Vercel Hobby: name `WMT83`, email
-  `werner.teichert@gmail.com`.
-- Deepgram and Anthropic keys are read from `Deno.env`, never hardcoded.
+```bash
+npm test
+npm run build
+```
+
+Tests cover ordering, day selection, low-demand filtering, normal-mode visibility, completion persistence, and task-step persistence. RLS policies in the migration enforce user isolation. Before release, add Playwright flows for account creation, all breakpoints, keyboard-only use, 200% zoom, screen readers, offline reconciliation, and RLS integration against local Supabase.
+
+## Deploy to Vercel
+
+Import the Git repository into Vercel, choose the Next.js preset, set the two public Supabase environment variables, and deploy. Apply Supabase migrations separately before enabling cloud accounts. No server secrets belong in `NEXT_PUBLIC_` variables.
+
+## Evidence-informed and safety decisions
+
+- Concrete prompts, visual sequencing, short exercises, editable plans, minimum versions, and transition-friendly copy reduce cognitive load.
+- Thought Check asks for a more complete view without labelling thoughts as distorted. Values work supports chosen action rather than compliance. Sensory distress is treated as valid information.
+- Skipping, finishing early, stopping, reducing a plan, and low-demand mode remain available. There are no streak losses, productivity judgements, or masking goals.
+- Immediate-help content explicitly directs people to local human support. AURA does not attempt crisis counselling, diagnosis, medication advice, or automated clinical interpretation.
+
+## Privacy and accessibility
+
+Psychological content is sensitive. A commercial deployment needs a privacy impact assessment, retention controls, encrypted export and deletion verification, region-specific consent, and security review. Do not add advertising trackers or log reflection content. Target WCAG 2.2 AA through user research and an external audit. Current foundations include keyboard semantics, labels, focus indicators, contrast, touch sizing, plain language, responsive navigation, and reduced-motion support.
+
+## Known limitations
+
+- Account UI and Supabase sync are not yet wired. The production schema exists, while the MVP uses resilient browser persistence.
+- PWA caching and background sync need a service worker and conflict policy.
+- Notifications, custom timer input, alternate routine versions, drag-and-drop, export/delete execution, and support-person sharing remain future work.
+- Pattern insights use seeded demonstration language, not clinical inference. The date in the polished demo is fixed for a predictable walkthrough.
+
+## Roadmap and validation
+
+Phase 2 should prioritise authenticated sync, explicit trusted-support consent, calendar integration, notifications, offline outbox, personalised sensory strategies, and comprehensive end-to-end/accessibility tests. Later phases may add optional editable AURA Assist planning, wearables, consent-led OT collaboration, and experiment-framed pattern detection.
+
+Before commercial launch, conduct participatory design with autistic adolescents and adults across communication needs, intellectual abilities, cultures, and support contexts. Include safeguarding specialists, OTs, psychologists, privacy counsel, accessibility auditors, and caregivers without displacing autistic decision-making. Validate whether prompts reduce cognitive load, distinguish overload from avoidance safely, avoid demand escalation, work during distress, and remain usable with assistive technology. Run a clinical safety case and jurisdiction-specific regulatory assessment without claiming to treat autism.
